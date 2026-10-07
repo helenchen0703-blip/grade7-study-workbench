@@ -1,0 +1,625 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>初一学习工作台</title>
+<style>
+html{color-scheme:light}body{margin:0}
+/* Layout: 经纬网 grid motif in the header; main column (today + subject tabs) beside a side rail (14-day record + messages). */
+:root{
+  --bg:#EEF3F4; --paper:#FFFFFF; --ink:#16242C; --muted:#5B6C74; --line:#D3DEE2;
+  --accent:#1E6A86; --accent-soft:#DCEBF0; --warm:#C9711E; --warm-soft:#F6E6D4;
+  --good:#2E7D4F; --good-soft:#DDEFE3; --bad:#B23A3A; --bad-soft:#F5DDDD;
+  --f-display:"Songti SC","STSong",serif;
+  --f-body:"PingFang SC","Microsoft YaHei",system-ui,sans-serif;
+  --f-mono:ui-monospace,Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0F181D; --paper:#16232A; --ink:#E4ECEF; --muted:#93A6AE; --line:#29404A;
+  --accent:#6DB8D4; --accent-soft:#1B3540; --warm:#E59A55; --warm-soft:#3A2A1B;
+  --good:#6CC08E; --good-soft:#18352A; --bad:#E07B7B; --bad-soft:#3D1F22; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0F181D; --paper:#16232A; --ink:#E4ECEF; --muted:#93A6AE; --line:#29404A;
+  --accent:#6DB8D4; --accent-soft:#1B3540; --warm:#E59A55; --warm-soft:#3A2A1B;
+  --good:#6CC08E; --good-soft:#18352A; --bad:#E07B7B; --bad-soft:#3D1F22; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.6;padding:0 16px}
+.wrap{max-width:1080px;margin:0 auto;padding-block:20px 48px;display:flex;flex-direction:column;gap:20px}
+h1,h2,h3{text-wrap:balance;margin:0}
+h2{font-family:var(--f-display);font-weight:400;font-size:22px}
+h3{font-size:15px;font-weight:700}
+p{margin:0}
+button,input,textarea{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+/* header */
+.top{position:relative;overflow:hidden;border-radius:14px;background:var(--accent);color:#fff;padding:22px 22px 20px;
+  background-image:linear-gradient(rgba(255,255,255,.12) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.12) 1px,transparent 1px);
+  background-size:36px 36px;display:flex;flex-wrap:wrap;gap:16px;align-items:flex-end;justify-content:space-between}
+:root[data-theme="dark"] .top{color:#0F181D}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .top{color:#0F181D}}
+.top h1{font-family:var(--f-display);font-weight:400;font-size:32px;line-height:1.15}
+.top .sub{opacity:.85;margin-top:4px}
+.coord{font-family:var(--f-mono);font-size:12px;letter-spacing:.06em;opacity:.8;margin-bottom:6px}
+.stats{display:flex;gap:10px;flex-wrap:wrap}
+.stat{background:rgba(255,255,255,.16);border-radius:10px;padding:8px 14px;min-width:88px}
+.stat b{display:block;font-family:var(--f-mono);font-size:22px;font-variant-numeric:tabular-nums;line-height:1.2}
+.stat span{font-size:12px;opacity:.85}
+.sync{font-size:13px;padding:8px 12px;border-radius:10px;border:1px solid var(--line);background:var(--paper);color:var(--muted)}
+.sync.ok{border-color:var(--good);color:var(--good);background:var(--good-soft)}
+.sync.warn{border-color:var(--warm);color:var(--warm);background:var(--warm-soft)}
+
+.grid{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:20px;align-items:start}
+@media (max-width:860px){.grid{grid-template-columns:1fr}}
+.col{display:flex;flex-direction:column;gap:20px;min-width:0}
+.card{background:var(--paper);border:1px solid var(--line);border-radius:14px;padding:18px;display:flex;flex-direction:column;gap:14px;min-width:0}
+.card-head{display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap}
+.muted{color:var(--muted);font-size:13px}
+.eyebrow{font-size:12px;letter-spacing:.08em;color:var(--muted);font-weight:500}
+
+/* tasks */
+.tasks{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+.task{display:flex;gap:12px;align-items:flex-start;padding:12px;border:1px solid var(--line);border-radius:10px;cursor:pointer;transition:background .15s}
+.task:hover{background:var(--bg)}
+.task input{width:20px;height:20px;margin:2px 0 0;accent-color:var(--good);flex:none}
+.task.done{background:var(--good-soft);border-color:transparent}
+.task.done .t-title{text-decoration:line-through;text-decoration-color:var(--good)}
+.task .t-body{min-width:0;display:flex;flex-direction:column;gap:2px}
+.tag{display:inline-block;font-size:11px;font-weight:700;padding:1px 7px;border-radius:99px;margin-right:6px;vertical-align:1px}
+.tag.geo{background:var(--accent-soft);color:var(--accent)}
+.tag.dao{background:var(--bad-soft);color:var(--bad)}
+.tag.en{background:var(--good-soft);color:var(--good)}
+.tag.math{background:var(--warm-soft);color:var(--warm)}
+.tag.all{background:var(--bg);color:var(--muted);border:1px solid var(--line)}
+.progress{height:6px;background:var(--bg);border-radius:99px;overflow:hidden}
+.progress i{display:block;height:100%;background:var(--good);width:0;transition:width .3s}
+.chips{display:flex;gap:8px;flex-wrap:wrap}
+.chip{border:1px solid var(--line);background:var(--paper);border-radius:99px;padding:5px 14px;cursor:pointer;font-size:14px}
+.chip[aria-pressed="true"]{background:var(--accent);color:var(--paper);border-color:var(--accent)}
+textarea,input[type=text],input[type=number]{width:100%;border:1px solid var(--line);border-radius:8px;background:var(--bg);padding:8px 10px}
+textarea{resize:vertical;min-height:64px}
+.btn{border:0;background:var(--accent);color:var(--paper);border-radius:8px;padding:8px 16px;cursor:pointer;font-weight:500}
+.btn.ghost{background:transparent;color:var(--accent);border:1px solid var(--accent)}
+.btn:disabled{opacity:.5;cursor:default}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.saved{font-size:12px;color:var(--good)}
+
+/* tabs */
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);overflow-x:auto}
+.tab{background:none;border:0;padding:8px 14px;cursor:pointer;border-bottom:3px solid transparent;color:var(--muted);font-weight:500;white-space:nowrap}
+.tab[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--accent)}
+.panel{display:flex;flex-direction:column;gap:16px}
+.why{background:var(--bg);border-radius:10px;padding:12px 14px;font-size:14px}
+.rules{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px}
+.rule{border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+.rule b{font-family:var(--f-display);font-weight:400;font-size:18px;display:block;color:var(--accent)}
+.rule span{font-size:13px;color:var(--muted)}
+.trap{border-left:3px solid var(--warm);background:var(--warm-soft);padding:10px 12px;border-radius:0 10px 10px 0;font-size:14px}
+
+/* quiz */
+.quiz{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px;align-items:center}
+@media (max-width:560px){.quiz{grid-template-columns:1fr}}
+.quiz svg{width:100%;max-width:360px;height:auto;display:block;margin:0 auto}
+.quiz svg .gl{stroke:var(--line);stroke-width:1.2}
+.quiz svg .gl0{stroke:var(--accent);stroke-width:2}
+.quiz svg text{fill:var(--muted);font-family:var(--f-mono);font-size:11px}
+.quiz svg .pt{fill:var(--bad)}
+.quiz svg .ptl{fill:var(--bad);font-weight:700;font-size:13px}
+.qside{display:flex;flex-direction:column;gap:10px;min-width:0}
+.opts{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.opt{border:1px solid var(--line);background:var(--paper);border-radius:8px;padding:10px;cursor:pointer;font-family:var(--f-mono);font-size:14px}
+.opt:hover:not(:disabled){border-color:var(--accent)}
+.opt.right{background:var(--good-soft);border-color:var(--good);color:var(--good)}
+.opt.wrong{background:var(--bad-soft);border-color:var(--bad);color:var(--bad)}
+.feedback{font-size:14px;min-height:1.6em}
+.score{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+
+/* dao */
+.tpl{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px}
+.tpl div{border:1px solid var(--line);border-radius:10px;padding:12px}
+.tpl b{display:block;margin-bottom:4px}
+.tpl p{font-size:14px;color:var(--muted)}
+.tr{border:1px solid var(--line);border-radius:10px;padding:12px;display:flex;flex-direction:column;gap:8px}
+.tr .plain{font-size:14px}
+.tr .book{font-size:14px;background:var(--accent-soft);border-radius:8px;padding:8px 10px}
+.list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+.list li{display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid var(--line);font-size:14px}
+.list li:last-child{border-bottom:0}
+.list .meta{color:var(--muted);font-size:12px;white-space:nowrap;font-family:var(--f-mono)}
+.x{background:none;border:0;color:var(--muted);cursor:pointer;padding:0 4px}
+.empty{color:var(--muted);font-size:14px;padding:6px 0}
+.books{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px}
+.book-i{border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+.book-i b{font-size:14px;display:block}
+.book-i span{font-size:12px;color:var(--muted)}
+.form3{display:grid;grid-template-columns:2fr 80px 2fr auto;gap:8px}
+@media (max-width:560px){.form3{grid-template-columns:1fr 1fr}}
+
+/* calendar */
+.days{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}
+.day{aspect-ratio:1;max-width:100%;border-radius:8px;border:1px solid var(--line);background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;font-family:var(--f-mono);font-size:12px;padding:0;color:var(--muted)}
+.day.part{background:var(--warm-soft);border-color:transparent;color:var(--warm)}
+.day.full{background:var(--good);border-color:transparent;color:var(--paper)}
+.day.today{outline:2px solid var(--accent);outline-offset:1px}
+.day[aria-pressed="true"]{box-shadow:inset 0 0 0 2px var(--ink)}
+.day small{font-size:9px;opacity:.8}
+.legend{display:flex;gap:12px;font-size:12px;color:var(--muted);flex-wrap:wrap}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:4px;vertical-align:-1px}
+.detail{background:var(--bg);border-radius:10px;padding:12px;font-size:14px;display:flex;flex-direction:column;gap:4px}
+
+/* messages */
+.msgs{display:flex;flex-direction:column;gap:8px;max-height:360px;overflow-y:auto}
+.msg{border-radius:10px;padding:8px 12px;font-size:14px;max-width:92%}
+.msg.parent{background:var(--warm-soft);align-self:flex-start}
+.msg.student{background:var(--accent-soft);align-self:flex-end}
+.msg .who{font-size:11px;color:var(--muted);display:flex;gap:8px;justify-content:space-between}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+</head><body>
+<div class="wrap">
+  <header class="top">
+    <div>
+      <div class="coord" id="coord">31°N · 121°E · 七年级上册</div>
+      <h1>初一学习工作台</h1>
+      <p class="sub" id="today-label">每天大约 20 分钟，做完打勾就行。</p>
+    </div>
+    <div class="stats">
+      <div class="stat"><b id="st-streak">0</b><span>连续打卡天数</span></div>
+      <div class="stat"><b id="st-quiz">–</b><span>本周经纬网正确率</span></div>
+      <div class="stat"><b id="st-read">0</b><span>本周英语阅读分钟</span></div>
+    </div>
+  </header>
+
+  <div class="sync" id="sync" role="status">正在加载……</div>
+
+  <div class="grid">
+    <div class="col">
+      <section class="card" aria-labelledby="h-today">
+        <div class="card-head">
+          <h2 id="h-today">今天的任务</h2>
+          <span class="muted" id="today-count"></span>
+        </div>
+        <div class="progress"><i id="today-bar"></i></div>
+        <ul class="tasks" id="tasks"></ul>
+        <div class="row" style="justify-content:space-between">
+          <span class="eyebrow">今天学得怎么样</span>
+          <div class="chips" id="moods"></div>
+        </div>
+        <label class="muted" for="note">一句话记录（今天学到什么、哪里不懂，都可以写）</label>
+        <textarea id="note" placeholder="例如：今天终于搞懂了西经为什么是往左变大"></textarea>
+        <div class="row"><button class="btn" id="save-note">保存</button><button class="btn ghost" id="copy-sum">复制今日小结，发给家人</button><span class="saved" id="note-saved"></span></div>
+        <textarea id="sum-box" readonly hidden></textarea>
+      </section>
+
+      <section class="card" aria-label="分科练习">
+        <div class="tabs" role="tablist" id="tabs">
+          <button class="tab" role="tab" data-tab="geo" id="tab-geo">地理 · 经纬网</button>
+          <button class="tab" role="tab" data-tab="dao" id="tab-dao">道德与法治</button>
+          <button class="tab" role="tab" data-tab="en" id="tab-en">英语阅读</button>
+          <button class="tab" role="tab" data-tab="more" id="tab-more">数学 · 生物</button>
+        </div>
+
+        <div class="panel" data-panel="geo">
+          <div class="why">你说经纬度有点难，这很正常，很多同学都卡在这里。先记住下面四句，再做小测。<b>标签上不写 E、W、N、S，要靠你自己看数字往哪边变大来判断。</b></div>
+          <div class="rules">
+            <div class="rule"><b>经线竖，纬线横</b><span>经线连接南北两极，纬线是绕地球一圈的圆</span></div>
+            <div class="rule"><b>东经向东增</b><span>数字往右（东）变大，就是东经 E</span></div>
+            <div class="rule"><b>西经向西增</b><span>数字往左（西）变大，就是西经 W</span></div>
+            <div class="rule"><b>北纬向北增</b><span>数字往上（北）变大是北纬 N，往下变大是南纬 S</span></div>
+          </div>
+          <div class="trap">易错点：东西半球的分界线是 <b>20°W 和 160°E</b>，不是 0° 和 180°。20°W 往东到 160°E 这一半是东半球。</div>
+          <div class="quiz">
+            <svg id="qsvg" viewBox="0 0 330 270" role="img" aria-label="经纬网图"></svg>
+            <div class="qside">
+              <div class="row" style="justify-content:space-between"><h3 id="qtext">读出 A 点的经纬度</h3><span class="score muted" id="qscore">今天 0/0</span></div>
+              <div class="opts" id="qopts"></div>
+              <p class="feedback" id="qfb"></p>
+              <button class="btn ghost" id="qnext">下一题</button>
+            </div>
+          </div>
+          <p class="muted">建议：答完一题后，试着把为什么选这个答案讲出来。能讲清楚，才算真的懂了。手边有地球仪的话，转着看更直观。</p>
+        </div>
+
+        <div class="panel" data-panel="dao" hidden>
+          <div class="why">你懂道理，只是答题的时候不知道"怎么说"。办法是<b>把课本上的话变成自己的话，再在答题时把它们写回去</b>。老师给分主要看关键词。</div>
+          <h3>三种题型，三个套路</h3>
+          <div class="tpl">
+            <div><b>是什么</b><p>写概念或观点，尽量用课本原句。题目问什么就答什么。</p></div>
+            <div><b>为什么</b><p>答意义和作用：对自己（成长、发展）有什么好处，对他人和社会有什么好处。</p></div>
+            <div><b>怎么做</b><p>分点写：个人、家庭、学校、社会。先写态度（树立……意识），再写行动（做到……）。</p></div>
+          </div>
+          <p class="muted">小技巧：分点作答，每点开头写关键词；材料题记得写"结合材料"，把材料里的人和事带进答案。</p>
+
+          <h3>翻译练习：大白话 → 课本语言</h3>
+          <div id="trans"></div>
+
+          <h3>我的关键词本</h3>
+          <p class="muted">每学一课，把书上加粗的句子、关键词抄进来，考前翻一遍。</p>
+          <div class="form3" style="grid-template-columns:1fr 2fr auto">
+            <input type="text" id="kw-lesson" placeholder="哪一课">
+            <input type="text" id="kw-term" placeholder="关键词或课本原句">
+            <button class="btn" id="kw-add">加入</button>
+          </div>
+          <ul class="list" id="kw-list"></ul>
+        </div>
+
+        <div class="panel" data-panel="en" hidden>
+          <div class="why">你能根据上下文猜出生词的意思，这是很强的阅读能力。不用提前学课本，<b>读自己觉得有意思的英文就好</b>：比现在的水平难一点点，但不会读得很累。遇到生词先猜，不用每个都查。</div>
+          <h3>可以从这些开始</h3>
+          <div class="books">
+            <div class="book-i"><b>Diary of a Wimpy Kid</b><span>小屁孩日记 · 漫画日记，很好笑</span></div>
+            <div class="book-i"><b>Dog Man</b><span>图多字少，节奏快</span></div>
+            <div class="book-i"><b>Big Nate</b><span>校园漫画，跟你年龄差不多</span></div>
+            <div class="book-i"><b>书虫 1–2 级</b><span>外研社分级读物，有中文注释</span></div>
+            <div class="book-i"><b>Magic Tree House</b><span>神奇树屋 · 冒险故事，句子简单</span></div>
+            <div class="book-i"><b>自己喜欢的话题</b><span>游戏、体育、动物、科普的英文视频或文章都算</span></div>
+          </div>
+          <h3>阅读记录</h3>
+          <div class="form3">
+            <input type="text" id="rd-title" placeholder="读了什么">
+            <input type="number" id="rd-min" placeholder="分钟" min="1" max="300">
+            <input type="text" id="rd-word" placeholder="猜对的一个生词（可不填）">
+            <button class="btn" id="rd-add">记录</button>
+          </div>
+          <ul class="list" id="rd-list"></ul>
+        </div>
+
+        <div class="panel" data-panel="more" hidden>
+          <div class="why">数学和生物你都说不难，那就保持住。数学每周看一次错题，确认是真的会了，不只是"上课听懂了"。</div>
+          <h3>数学：错题三问</h3>
+          <div class="tpl">
+            <div><b>1. 错在哪一步？</b><p>找到第一处出错的地方，圈出来。</p></div>
+            <div><b>2. 为什么错？</b><p>没看清题、概念没懂，还是计算粗心？初一的有理数符号和去括号最容易出错。</p></div>
+            <div><b>3. 下次怎么避免？</b><p>写一句提醒给自己，然后重新做一遍。</p></div>
+          </div>
+          <h3>生物</h3>
+          <p>生物是你的强项。记细胞、植物结构这类内容时，自己画一张简图标上名称，比只看书记得牢。</p>
+        </div>
+      </section>
+    </div>
+
+    <aside class="col">
+      <section class="card" aria-labelledby="h-cal">
+        <div class="card-head"><h2 id="h-cal">最近两周</h2><span class="muted">点一天看详情</span></div>
+        <div class="days" id="days"></div>
+        <div class="legend"><span><i style="background:var(--good)"></i>全部完成</span><span><i style="background:var(--warm-soft)"></i>做了一部分</span><span><i style="background:var(--bg);border:1px solid var(--line)"></i>没打卡</span></div>
+        <div class="detail" id="day-detail" hidden></div>
+      </section>
+
+      <section class="card" aria-labelledby="h-msg">
+        <div class="card-head"><h2 id="h-msg">备忘</h2><span class="muted" id="role-label"></span></div>
+        <div class="msgs" id="msgs"></div>
+        <label class="muted" for="msg-in">给自己的备忘：不懂的题、想问家里人的事，先记在这里，下次打电话时问</label>
+        <textarea id="msg-in"></textarea>
+        <div class="row"><button class="btn" id="msg-send">记下来</button></div>
+      </section>
+    </aside>
+  </div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+  const $ = id => document.getElementById(id);
+  const pad = n => String(n).padStart(2,"0");
+  const ymd = d => d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate());
+  const TODAY = ymd(new Date());
+  const WD = ["周日","周一","周二","周三","周四","周五","周六"];
+  const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+  /* ---------- task schedule ---------- */
+  const T = {
+    en:   {tag:"en",   label:"英语", title:"英语阅读 10 分钟", hint:"漫画、分级读物、英文视频都算，读完在「英语阅读」里记一笔"},
+    geo:  {tag:"geo",  label:"地理", title:"经纬网小测 5 题", hint:"在「地理 · 经纬网」里做，先看四句口诀"},
+    dao1: {tag:"dao",  label:"道法", title:"抄 3 个关键词进关键词本", hint:"找这周新学那一课书上的加粗句子"},
+    dao2: {tag:"dao",  label:"道法", title:"做 1 道翻译练习", hint:"先用自己的话说，再对照课本说法"},
+    math: {tag:"math", label:"数学", title:"看这周作业，弄懂 1 道错题", hint:"用「错题三问」，没有错题就打勾"},
+    teach:{tag:"all",  label:"综合", title:"当小老师：给家人讲 1 个知识点", hint:"打电话、发语音都行，讲经纬网最好"},
+    bag:  {tag:"all",  label:"综合", title:"看下周课表，整理书包", hint:""}
+  };
+  const PLAN = {0:["en","math","bag"],1:["en","geo"],2:["en","dao1"],3:["en","geo"],4:["en","dao2"],5:["en","geo","math"],6:["en","teach"]};
+  const tasksFor = dateStr => { const [y,m,d] = dateStr.split("-").map(Number); return PLAN[new Date(y,m-1,d).getDay()]; };
+
+  /* ---------- storage: shared db when available, else this device ---------- */
+  const LS_KEY = "workbench-local-v1";
+  const local = (() => { try { return JSON.parse(localStorage.getItem(LS_KEY)) || {}; } catch(e){ return {}; } })();
+  const lsSave = () => { try { localStorage.setItem(LS_KEY, JSON.stringify(local)); } catch(e){} };
+  const listeners = {};
+  const state = { checkins:{}, keywords:[], reading:[], messages:[] };
+  let db = null, readOnly = false, role = "student";
+
+  function setSync(kind, text){ const el = $("sync"); el.className = "sync " + kind; el.textContent = text; }
+  function localEmit(coll){
+    const docs = Object.entries(local[coll] || {}).map(([id,data]) => ({id, ...data}))
+      .sort((a,b) => (b.sortKey||"").localeCompare(a.sortKey||""));
+    (listeners[coll]||[]).forEach(fn => fn(docs));
+  }
+  function watch(coll, fn){
+    (listeners[coll] = listeners[coll] || []).push(fn);
+    if (!db) { localEmit(coll); return; }
+    db.collection(coll).orderBy("sortKey","desc").limit(200).onSnapshot(
+      snap => fn(snap.docs.map(d => ({id:d.id, ...d.data()}))),
+      () => {}
+    );
+  }
+  async function put(coll, id, data){
+    if (!db) { (local[coll] = local[coll] || {})[id] = data; lsSave(); localEmit(coll); return true; }
+    try { await db.collection(coll).doc(id).set(data); return true; }
+    catch(e){ handleWriteError(e); return false; }
+  }
+  async function remove(coll, id){
+    if (!db) { if (local[coll]) delete local[coll][id]; lsSave(); localEmit(coll); return; }
+    try { await db.collection(coll).doc(id).delete(); } catch(e){ handleWriteError(e); }
+  }
+  const newId = () => Date.now().toString(36) + Math.random().toString(36).slice(2,7);
+  function handleWriteError(e){
+    if (e && e.code === "invalid_argument") {
+      readOnly = true;
+      setSync("warn", "你现在只能看，不能保存。请让家长在分享设置里用你的邮箱把你加为「编辑者」。");
+    } else {
+      setSync("warn", "刚才没保存成功，网络可能不稳定，稍后再试一次。");
+    }
+  }
+
+  /* ---------- today ---------- */
+  const todayDoc = () => state.checkins[TODAY] || {date:TODAY, sortKey:TODAY, done:{}, mood:"", note:"", quizRight:0, quizTotal:0};
+  function saveToday(patch){
+    const doc = Object.assign({}, todayDoc(), patch, {date:TODAY, sortKey:TODAY});
+    state.checkins[TODAY] = doc;
+    renderToday(); renderDays(); renderStats();
+    return put("checkins", TODAY, doc);
+  }
+  function renderToday(){
+    const d = new Date(), doc = todayDoc(), keys = tasksFor(TODAY);
+    $("today-label").textContent = (d.getMonth()+1) + " 月 " + d.getDate() + " 日 " + WD[d.getDay()] + " · 每天大约 20 分钟，做完打勾就行。";
+    $("tasks").innerHTML = keys.map(k => {
+      const t = T[k], on = !!doc.done[k];
+      return `<li><label class="task${on?" done":""}"><input type="checkbox" data-k="${k}" ${on?"checked":""}>
+        <span class="t-body"><span class="t-title"><span class="tag ${t.tag}">${t.label}</span>${esc(t.title)}</span>${t.hint?`<span class="muted">${esc(t.hint)}</span>`:""}</span></label></li>`;
+    }).join("");
+    const n = keys.filter(k => doc.done[k]).length;
+    $("today-count").textContent = n + " / " + keys.length + (n === keys.length ? " · 今天的都做完了" : "");
+    $("today-bar").style.width = (n / keys.length * 100) + "%";
+    $("moods").innerHTML = ["轻松","还行","有点累"].map(m => `<button class="chip" data-mood="${m}" aria-pressed="${doc.mood===m}">${m}</button>`).join("");
+    if (document.activeElement !== $("note")) $("note").value = doc.note || "";
+  }
+  $("tasks").addEventListener("change", e => {
+    const k = e.target.dataset.k; if (!k) return;
+    const done = Object.assign({}, todayDoc().done, {[k]: e.target.checked});
+    saveToday({done});
+  });
+  $("moods").addEventListener("click", e => { const m = e.target.dataset.mood; if (m) saveToday({mood:m}); });
+  $("save-note").addEventListener("click", async () => {
+    const ok = await saveToday({note: $("note").value.trim()});
+    if (ok) { $("note-saved").textContent = "已保存"; setTimeout(() => $("note-saved").textContent = "", 2000); }
+  });
+
+  /* ---------- calendar + stats ---------- */
+  let selectedDay = null;
+  function lastDays(n){ const out=[]; for (let i=n-1;i>=0;i--){ const d=new Date(); d.setDate(d.getDate()-i); out.push(ymd(d)); } return out; }
+  function dayStatus(ds){
+    const doc = state.checkins[ds]; if (!doc) return "";
+    const keys = tasksFor(ds), n = keys.filter(k => doc.done && doc.done[k]).length;
+    return n === 0 ? "" : n === keys.length ? "full" : "part";
+  }
+  function renderDays(){
+    $("days").innerHTML = lastDays(14).map(ds => {
+      const [,m,d] = ds.split("-"), wd = WD[new Date(+ds.slice(0,4), +m-1, +d).getDay()].slice(1);
+      return `<button class="day ${dayStatus(ds)}${ds===TODAY?" today":""}" data-day="${ds}" aria-pressed="${selectedDay===ds}" aria-label="${+m}月${+d}日"><span>${+d}</span><small>${wd}</small></button>`;
+    }).join("");
+    renderDetail();
+  }
+  function renderDetail(){
+    const box = $("day-detail");
+    if (!selectedDay) { box.hidden = true; return; }
+    const doc = state.checkins[selectedDay], keys = tasksFor(selectedDay), [,m,d] = selectedDay.split("-");
+    let html = `<b>${+m} 月 ${+d} 日</b>`;
+    if (!doc) html += `<span class="muted">这天没有打卡记录。</span>`;
+    else {
+      html += keys.map(k => `<span>${doc.done && doc.done[k] ? "✓" : "○"} ${esc(T[k].title)}</span>`).join("");
+      if (doc.quizTotal) html += `<span>经纬网小测：${doc.quizRight} / ${doc.quizTotal}</span>`;
+      if (doc.mood) html += `<span>感觉：${esc(doc.mood)}</span>`;
+      if (doc.note) html += `<span>记录：${esc(doc.note)}</span>`;
+    }
+    box.innerHTML = html; box.hidden = false;
+  }
+  $("days").addEventListener("click", e => {
+    const b = e.target.closest("[data-day]"); if (!b) return;
+    selectedDay = selectedDay === b.dataset.day ? null : b.dataset.day; renderDays();
+  });
+  function renderStats(){
+    let streak = 0; const d = new Date();
+    if (!dayStatus(TODAY)) d.setDate(d.getDate()-1);
+    while (dayStatus(ymd(d))) { streak++; d.setDate(d.getDate()-1); }
+    $("st-streak").textContent = streak;
+    const week = lastDays(7);
+    let r = 0, t = 0; week.forEach(ds => { const c = state.checkins[ds]; if (c) { r += c.quizRight||0; t += c.quizTotal||0; } });
+    $("st-quiz").textContent = t ? Math.round(r/t*100) + "%" : "–";
+    const mins = state.reading.filter(x => week.includes(x.date)).reduce((s,x) => s + (Number(x.minutes)||0), 0);
+    $("st-read").textContent = mins;
+  }
+
+  /* ---------- tabs ---------- */
+  function showTab(name){
+    document.querySelectorAll(".tab").forEach(b => b.setAttribute("aria-selected", b.dataset.tab === name));
+    document.querySelectorAll("[data-panel]").forEach(p => p.hidden = p.dataset.panel !== name);
+    try { localStorage.setItem("workbench-tab", name); } catch(e){}
+  }
+  $("tabs").addEventListener("click", e => { const b = e.target.closest(".tab"); if (b) showTab(b.dataset.tab); });
+  let startTab = "geo"; try { startTab = localStorage.getItem("workbench-tab") || "geo"; } catch(e){}
+  showTab(startTab);
+
+  /* ---------- 经纬网 quiz ---------- */
+  const rnd = (a,b) => a + Math.floor(Math.random()*(b-a+1));
+  const fmtLon = v => v === 0 ? "0°" : Math.abs(v) + "°" + (v > 0 ? "E" : "W");
+  const fmtLat = v => v === 0 ? "0°" : Math.abs(v) + "°" + (v > 0 ? "N" : "S");
+  let Q = null;
+  function makeQuestion(){
+    const step = 10, lon0 = rnd(-8,9)*step, lat0 = rnd(-6,2)*step;   // 5×5 grid
+    const lons = [0,1,2,3,4].map(i => lon0 + i*step), lats = [0,1,2,3,4].map(i => lat0 + i*step);
+    const types = ["coord","coord","hemiEW","hemiNS"];
+    let type, lon, lat, tries = 0;
+    do {
+      type = types[rnd(0,3)];
+      lon = lons[rnd(0,4)]; lat = lats[rnd(0,4)]; tries++;
+    } while (tries < 50 && (lon === 0 || lat === 0 || (type === "hemiEW" && (lon === -20 || lon === 160))));
+    let text, options, answer;
+    if (type === "coord") {
+      text = "读出 A 点的经纬度";
+      answer = fmtLon(lon) + "，" + fmtLat(lat);
+      options = [answer, fmtLon(-lon)+"，"+fmtLat(lat), fmtLon(lon)+"，"+fmtLat(-lat), fmtLon(-lon)+"，"+fmtLat(-lat)].sort(() => Math.random()-.5);
+    } else if (type === "hemiEW") {
+      text = "A 点在东半球还是西半球？";
+      answer = (lon >= -20 && lon < 160) ? "东半球" : "西半球"; options = ["东半球","西半球"];
+    } else {
+      text = "A 点在南半球还是北半球？";
+      answer = lat > 0 ? "北半球" : "南半球"; options = ["北半球","南半球"];
+    }
+    Q = {lons, lats, lon, lat, type, text, options, answer, answered:false};
+    drawQuestion();
+  }
+  function drawQuestion(){
+    const X = i => 50 + i*62, Y = j => 225 - j*50;
+    let s = "";
+    Q.lons.forEach((v,i) => { s += `<line class="${v===0?"gl0":"gl"}" x1="${X(i)}" y1="${Y(4)-10}" x2="${X(i)}" y2="${Y(0)+10}"/><text x="${X(i)}" y="${Y(0)+28}" text-anchor="middle">${Math.abs(v)}°</text>`; });
+    Q.lats.forEach((v,j) => { s += `<line class="${v===0?"gl0":"gl"}" x1="${X(0)-10}" y1="${Y(j)}" x2="${X(4)+10}" y2="${Y(j)}"/><text x="${X(0)-16}" y="${Y(j)+4}" text-anchor="end">${Math.abs(v)}°</text>`; });
+    const px = X(Q.lons.indexOf(Q.lon)), py = Y(Q.lats.indexOf(Q.lat));
+    s += `<circle class="pt" cx="${px}" cy="${py}" r="6"/><text class="ptl" x="${px+9}" y="${py-8}">A</text>`;
+    $("qsvg").innerHTML = s;
+    $("qtext").textContent = Q.text;
+    $("qopts").innerHTML = Q.options.map(o => `<button class="opt" data-o="${esc(o)}">${esc(o)}</button>`).join("");
+    $("qfb").textContent = "";
+  }
+  function explain(){
+    const lonDir = Q.lon > 0 ? "往右（东）变大，是东经" : "往左（西）变大，是西经";
+    const latDir = Q.lat > 0 ? "往上（北）变大，是北纬" : "往下（南）变大，是南纬";
+    if (Q.type === "coord") return `横着看下面的数字：${lonDir}；竖着看左边的数字：${latDir}。`;
+    if (Q.type === "hemiEW") return `A 点是 ${fmtLon(Q.lon)}。记住分界线是 20°W 和 160°E：20°W 往东到 160°E 是东半球，其余是西半球。`;
+    return `左边的数字${latDir}，所以 A 点在${Q.answer}。赤道（0°纬线）以北是北半球。`;
+  }
+  $("qopts").addEventListener("click", e => {
+    const b = e.target.closest(".opt"); if (!b || Q.answered) return;
+    Q.answered = true;
+    const right = b.dataset.o === Q.answer;
+    document.querySelectorAll(".opt").forEach(o => { o.disabled = true; if (o.dataset.o === Q.answer) o.classList.add("right"); });
+    if (!right) b.classList.add("wrong");
+    $("qfb").textContent = (right ? "答对了。" : "再看一下：") + explain();
+    const doc = todayDoc();
+    saveToday({quizRight:(doc.quizRight||0) + (right?1:0), quizTotal:(doc.quizTotal||0) + 1});
+  });
+  $("qnext").addEventListener("click", makeQuestion);
+  function renderQuizScore(){ const d = todayDoc(); $("qscore").textContent = "今天 " + (d.quizRight||0) + "/" + (d.quizTotal||0); }
+
+  /* ---------- 道法 ---------- */
+  const TRANS = [
+    ["朋友很重要，有朋友就不孤单。","友谊能让我们感受到关怀和支持，丰富我们的生活体验，让我们更好地认识自己。"],
+    ["不要做危险的事，命只有一条。","生命是独特的、不可逆的。我们要珍爱生命，增强安全意识，提高自我保护能力。"],
+    ["我要多看看自己的优点，也要改掉缺点。","我们要正确认识自己，既接纳自己的优点，也正视自己的不足，不断完善自己。"],
+    ["上了初中要好好学习。","学习是成长的阶梯。我们要培养学习兴趣，掌握科学的学习方法，体会学习的快乐。"]
+  ];
+  $("trans").innerHTML = TRANS.map((t,i) => `<div class="tr"><span class="plain"><span class="tag all">大白话</span>${esc(t[0])}</span>
+    <button class="btn ghost" data-tr="${i}" style="align-self:flex-start">自己先想想，再看课本说法</button>
+    <span class="book" id="tr-${i}" hidden><span class="tag geo">课本语言</span>${esc(t[1])}</span></div>`).join("")
+    + `<p class="muted">课本说法以你手上的书为准。不同版本用词会有点差别，把书上的原句抄进关键词本最可靠。</p>`;
+  $("trans").addEventListener("click", e => { const i = e.target.dataset.tr; if (i == null) return; const el = $("tr-"+i); el.hidden = !el.hidden; e.target.textContent = el.hidden ? "自己先想想，再看课本说法" : "收起"; });
+  $("kw-add").addEventListener("click", async () => {
+    const term = $("kw-term").value.trim(); if (!term) return;
+    const lesson = $("kw-lesson").value.trim(), now = new Date().toISOString();
+    if (await put("keywords", newId(), {term, lesson, date:TODAY, sortKey:now})) { $("kw-term").value = ""; }
+  });
+  function renderKeywords(){
+    $("kw-list").innerHTML = state.keywords.length ? state.keywords.map(k =>
+      `<li><span>${k.lesson?`<span class="tag dao">${esc(k.lesson)}</span>`:""}${esc(k.term)}</span><span class="meta">${esc((k.date||"").slice(5))} <button class="x" data-del-kw="${esc(k.id)}" aria-label="删除">×</button></span></li>`).join("")
+      : `<li class="empty">还没有关键词。从这周学的那一课开始抄吧。</li>`;
+  }
+  $("kw-list").addEventListener("click", e => { const id = e.target.dataset.delKw; if (id) remove("keywords", id); });
+
+  /* ---------- 英语 ---------- */
+  $("rd-add").addEventListener("click", async () => {
+    const title = $("rd-title").value.trim(), minutes = parseInt($("rd-min").value, 10);
+    if (!title || !minutes) { $("rd-title").focus(); return; }
+    const word = $("rd-word").value.trim(), now = new Date().toISOString();
+    if (await put("reading", newId(), {title, minutes, word, date:TODAY, sortKey:now})) {
+      $("rd-title").value = ""; $("rd-min").value = ""; $("rd-word").value = "";
+      const done = todayDoc().done; if (!done.en) saveToday({done:Object.assign({}, done, {en:true})});
+    }
+  });
+  function renderReading(){
+    $("rd-list").innerHTML = state.reading.length ? state.reading.slice(0,30).map(r =>
+      `<li><span>${esc(r.title)}${r.word?` <span class="muted">· 猜出：${esc(r.word)}</span>`:""}</span><span class="meta">${esc((r.date||"").slice(5))} · ${Number(r.minutes)||0} 分钟 <button class="x" data-del-rd="${esc(r.id)}" aria-label="删除">×</button></span></li>`).join("")
+      : `<li class="empty">还没有记录。读完一本漫画或几页书，就在这里记一笔。</li>`;
+  }
+  $("rd-list").addEventListener("click", e => { const id = e.target.dataset.delRd; if (id) remove("reading", id); });
+
+  /* ---------- 留言 ---------- */
+  function renderMessages(){
+    const box = $("msgs");
+    const list = state.messages.slice().reverse();
+    box.innerHTML = list.length ? list.map(m => {
+      const who = "我";
+      const t = (m.sortKey||"").slice(5,16).replace("T"," ");
+      return `<div class="msg ${m.role==="parent"?"parent":"student"}"><div class="who"><span>${who}</span><span>${esc(t)}</span></div>${esc(m.text)}</div>`;
+    }).join("") : `<p class="empty">还没有备忘。</p>`;
+    box.scrollTop = box.scrollHeight;
+  }
+  $("msg-send").addEventListener("click", async () => {
+    const text = $("msg-in").value.trim(); if (!text) return;
+    if (await put("messages", newId(), {text, role, sortKey:new Date().toISOString()})) $("msg-in").value = "";
+  });
+
+  /* ---------- 今日小结 ---------- */
+  function buildSummary(){
+    const d = new Date(), doc = todayDoc(), keys = tasksFor(TODAY);
+    const lines = [`【学习打卡】${d.getMonth()+1}月${d.getDate()}日 ${WD[d.getDay()]}`];
+    keys.forEach(k => lines.push((doc.done[k] ? "✓ " : "○ ") + T[k].title));
+    if (doc.quizTotal) lines.push(`经纬网小测：${doc.quizRight}/${doc.quizTotal}`);
+    const rd = state.reading.filter(r => r.date === TODAY);
+    if (rd.length) lines.push("英语阅读：" + rd.map(r => `${r.title} ${r.minutes}分钟` + (r.word ? `（猜出：${r.word}）` : "")).join("；"));
+    const kw = state.keywords.filter(k => k.date === TODAY);
+    if (kw.length) lines.push("道法关键词：" + kw.map(k => k.term).join("；"));
+    if (doc.mood) lines.push("感觉：" + doc.mood);
+    const note = $("note").value.trim() || doc.note;
+    if (note) lines.push("记录：" + note);
+    let streak = $("st-streak").textContent; lines.push(`连续打卡 ${streak} 天`);
+    return lines.join("\n");
+  }
+  $("copy-sum").addEventListener("click", () => {
+    const text = buildSummary(), box = $("sum-box");
+    const shown = () => { $("note-saved").textContent = "已复制，去微信粘贴发送"; setTimeout(() => $("note-saved").textContent = "", 3000); };
+    const fallback = () => { box.hidden = false; box.value = text; box.style.minHeight = "160px"; box.focus(); box.select();
+      try { if (document.execCommand("copy")) { shown(); return; } } catch(e){} $("note-saved").textContent = "请长按下面的文字全选复制"; };
+    if (navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(text).then(shown, fallback); else fallback();
+  });
+
+  /* ---------- wire up ---------- */
+  function subscribeAll(){
+    watch("checkins", docs => { state.checkins = {}; docs.forEach(d => state.checkins[d.date || d.id] = d); renderToday(); renderDays(); renderStats(); renderQuizScore(); });
+    watch("keywords", docs => { state.keywords = docs; renderKeywords(); });
+    watch("reading",  docs => { state.reading = docs; renderReading(); renderStats(); });
+    watch("messages", docs => { state.messages = docs; renderMessages(); });
+  }
+  renderToday(); renderDays(); renderStats(); renderKeywords(); renderReading(); renderMessages(); makeQuestion();
+
+  (async () => {
+    let user = null;
+    try {
+      const c = window.claude;
+      [db, user] = c && c.use ? await Promise.all([c.use("db"), c.use("user")]) : [null, null];
+    } catch(e){ db = null; }
+    if (user) {
+      try { if (await user.isOwner()) role = "parent"; } catch(e){}
+    }
+    $("role-label").textContent = role === "parent" ? "你以家长身份留言" : "";
+    if (db) {
+      let canWrite = null;
+      try { canWrite = user ? await user.can("data.write") : null; } catch(e){}
+      if (canWrite === false) { readOnly = true; setSync("warn", "你现在只能看，不能保存。请让家长在分享设置里用你的邮箱把你加为「编辑者」。"); }
+      else setSync("ok", role === "parent" ? "已连接。这里能看到他每天的打卡、小测成绩、阅读记录和留言。" : "已连接。你打的勾和写的东西会自动保存，家里人也能看到。");
+    } else {
+      setSync("ok", "记录保存在这台设备的浏览器里（别清除浏览数据）。每天做完，点「复制今日小结」发到微信给家人。");
+    }
+    subscribeAll();
+  })();
+})();
+</script>
+
+</body></html>
